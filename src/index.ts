@@ -19,6 +19,7 @@ import {
   getMint,
   getInterestBearingMintConfigState,
   updateRateInterestBearingMint,
+  amountToUiAmount,
 } from '@solana/spl-token';
 import { initializeKeypair } from './keypair-helpers';
 
@@ -66,7 +67,17 @@ import { initializeKeypair } from './keypair-helpers';
   {
     // Logs out interest on token
     const rate = await getInterestBearingMint({ connection, mint })
-    console.log("The interest rate on this token is: ", rate)
+    const amount = 100;
+    // Convert amount to UI amount with accrued interest
+    const uiAmount = await amountToUiAmount(
+      connection,
+      payer,
+      mint,
+      amount,
+      TOKEN_2022_PROGRAM_ID,
+    );
+
+    console.log(`Amount with accrued interest at ${rate}: ${amount} tokens = ${uiAmount}% `);
   }
 
   {
@@ -97,14 +108,14 @@ async function getInterestBearingMint(inputs: GetInterestBearingMint) {
   const { connection, mint } = inputs
   const mintAccount = await getMint(
     connection,
-    mint, // Mint Account Address
-    undefined, // Optional commitment
-    TOKEN_2022_PROGRAM_ID, // Token Extension Program ID
+    mint,
+    undefined,
+    TOKEN_2022_PROGRAM_ID,
   );
 
   // Get Interest Config for Mint Account
   const interestBearingMintConfig = await getInterestBearingMintConfigState(
-    mintAccount, // Mint Account data
+    mintAccount,
   );
 
   return interestBearingMintConfig?.currentRate
@@ -120,7 +131,6 @@ async function testTryingToUpdateTokenInterestRate(inputs: UpdateInterestRate) {
   const { connection, payer, mint } = inputs;
   const rate = 0;
   const initialRate = await getInterestBearingMint({ connection, mint })
-  console.log("The initial interest rate before updating: ", initialRate)
   try {
     await updateRateInterestBearingMint(
       connection,
@@ -134,7 +144,7 @@ async function testTryingToUpdateTokenInterestRate(inputs: UpdateInterestRate) {
     );
     const newRate = await getInterestBearingMint({ connection, mint })
 
-    console.error(`✅ - We expected this to pass because the rate has been updated. New rate: ${newRate}`);
+    console.log(`✅ - We expected this to pass because the rate has been updated. Old rate: ${initialRate}. New rate: ${newRate}`);
   } catch (error) {
     console.error("You should be able to update the interest.");
 
@@ -142,10 +152,9 @@ async function testTryingToUpdateTokenInterestRate(inputs: UpdateInterestRate) {
 }
 
 async function testTryingToUpdateTokenInterestRateWithWrongOwner(inputs: UpdateInterestRate) {
+  // in this test case, payer is "otherAccount", which isn't the original payer
   const { connection, payer, mint } = inputs;
   const rate = 0;
-  const initialRate = await getInterestBearingMint({ connection, mint })
-  console.log("The initial interest rate before updating: ", initialRate)
   try {
     await updateRateInterestBearingMint(
       connection,
@@ -157,11 +166,9 @@ async function testTryingToUpdateTokenInterestRateWithWrongOwner(inputs: UpdateI
       undefined,
       TOKEN_2022_PROGRAM_ID,
     );
-    const newRate = await getInterestBearingMint({ connection, mint })
-
-    console.error(`✅ - We expected this to pass because the rate has been updated. New rate: ${newRate}`);
+    console.log("You should be able to update the interest.");
   } catch (error) {
-    console.error("You should be able to update the interest.");
+    console.error(`✅ - We expected this to fail because the owner is incorrect.`);
 
   }
 }
